@@ -13,6 +13,7 @@ import { useAccrual } from "@/hooks/use-accrual";
 import { useNow } from "@/hooks/use-now";
 import { formatTokenAmount, truncateAddress } from "@/lib/format";
 import { formatSchedule, NO_CLIFF_LABEL } from "@/lib/schedule";
+import { setSessionItem } from "@/lib/scroll";
 import { resolvedTimeZoneLabel } from "@/lib/timezone";
 import type { StreamView } from "@/types/stream";
 
@@ -86,7 +87,10 @@ export function StreamDetail({ stream, onComplete }: { stream: StreamView; onCom
       <div className="mb-3 flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => {
+            setSessionItem("tricklepay:from_stream_detail", "true");
+            router.back();
+          }}
           className="text-xs text-neutral-500 hover:text-neutral-300"
         >
           &larr; Back
@@ -98,7 +102,10 @@ export function StreamDetail({ stream, onComplete }: { stream: StreamView; onCom
       </div>
 
       <div className="mb-6 mt-3 flex items-center justify-between">
-        <h1 className="font-mono text-xl">Stream #{stream.id}</h1>
+        <h1 className="flex items-center gap-2 font-mono text-xl">
+          <span>Stream #{stream.id}</span>
+          <CopyButton value={stream.id} label="stream id" />
+        </h1>
         <StreamStatusBadge status={stream.status} variant="plain" />
       </div>
 

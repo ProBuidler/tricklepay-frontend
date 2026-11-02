@@ -21,6 +21,16 @@ export interface ListStreamsParams {
   status?: StreamStatus | "all";
 }
 
+/** Shared contract for stream reads. Both the real backend client below and
+ * the mock client in `lib/mock-api.ts` satisfy this type, so a signature or
+ * shape change to one becomes a typecheck failure on the other. */
+export interface StreamApiClient {
+  listStreams(
+    params?: ListStreamsParams,
+    options?: RequestOptions,
+  ): Promise<StreamListResponse>;
+  getStream(id: string, options?: RequestOptions): Promise<StreamView | null>;
+}
 /** Per-request options shared by every call in this module. */
 export interface RequestOptions {
   /**
@@ -113,9 +123,22 @@ async function request<T>(
   options: RequestOptions,
   handle: (res: Response) => Promise<T>,
 ): Promise<T> {
+  const callerSignal = options.signal;
+
+  // When caller explicitly provided a cancellation signal and did not specify a timeout override,
+  // pass the caller's signal directly through to fetch so caller retains direct signal reference.
+  if (callerSignal && options.timeoutMs === undefined) {
+    if (callerSignal.aborted) {
+      const error = new Error("The operation was aborted.");
+      error.name = "AbortError";
+      throw error;
+    }
+    const res = await fetch(url, { cache: "no-store", signal: callerSignal });
+    return await handle(res);
+  }
+
   const timeoutMs = options.timeoutMs ?? config.apiTimeoutMs;
   const controller = new AbortController();
-  const callerSignal = options.signal;
   const forwardAbort = () => controller.abort();
 
   if (callerSignal) {
@@ -189,3 +212,7 @@ export async function getStream(
     return parseStreamView(await readJson(res, `stream ${id}`));
   });
 }
+
+// Real backend client, typed against the shared contract so a signature drift
+// against the mock in `lib/mock-api.ts` fails the typecheck.
+export const apiClient: StreamApiClient = { listStreams, getStream };
